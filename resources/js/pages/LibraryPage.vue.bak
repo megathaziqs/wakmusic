@@ -1,0 +1,479 @@
+<template>
+  <div class="flex h-screen bg-black text-white overflow-hidden p-2 gap-2">
+    
+    <!-- Sidebar: Your Library (Left Column) -->
+    <aside class="w-80 flex-shrink-0 flex flex-col bg-[#121212] rounded-xl overflow-hidden">
+      <!-- Library Header -->
+      <div class="p-5 flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3 text-gray-400 hover:text-white transition-colors cursor-pointer group">
+            <Squares2X2Icon class="w-6 h-6" />
+            <span class="font-bold text-base">Your Library</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button type="button" @click="handleCreatePlaylistClick" class="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all">
+              <PlusIcon class="w-5 h-5" />
+            </button>
+            <button type="button" class="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all">
+              <ArrowRightIcon class="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Chips in Sidebar -->
+        <div class="flex gap-2 overflow-x-auto custom-scrollbar-hide pb-1">
+          <button class="px-3 py-1 bg-white/10 hover:bg-white/15 rounded-full text-xs font-bold whitespace-nowrap transition-colors">Playlists</button>
+          <button class="px-3 py-1 bg-white/10 hover:bg-white/15 rounded-full text-xs font-bold whitespace-nowrap transition-colors">Artists</button>
+          <button class="px-3 py-1 bg-white/10 hover:bg-white/15 rounded-full text-xs font-bold whitespace-nowrap transition-colors">Albums</button>
+        </div>
+      </div>
+
+      <!-- Search & Sort -->
+      <div class="px-5 pb-2 flex items-center justify-between">
+        <button class="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all">
+          <MagnifyingGlassIcon class="w-4 h-4" />
+        </button>
+        <button class="flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-white transition-colors">
+          <span>Recents</span>
+          <Bars3Icon class="w-4 h-4" />
+        </button>
+      </div>
+
+      <!-- Library List -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+        <!-- Liked Songs Static Link -->
+        <div 
+          @click="activeTab = 'songs'; selectedPlaylist = null"
+          class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white/5 transition-all group"
+          :class="{ 'bg-white/10': activeTab === 'songs' && !selectedPlaylist }"
+        >
+          <div class="w-12 h-12 bg-gradient-to-br from-indigo-700 via-purple-600 to-blue-400 rounded-md flex items-center justify-center shadow-lg">
+            <MusicalNoteIcon class="w-6 h-6 text-white" />
+          </div>
+          <div class="min-w-0">
+            <h4 class="font-bold text-sm truncate" :class="{ 'text-orange-500': activeTab === 'songs' && !selectedPlaylist }">Liked Songs</h4>
+            <p class="text-xs text-gray-400">Playlist • {{ musicList.length }} songs</p>
+          </div>
+        </div>
+
+        <!-- Albums & Playlists -->
+        <div 
+          v-for="album in albums" 
+          :key="album.id"
+          class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white/5 transition-all"
+        >
+          <div class="w-12 h-12 bg-gray-800 rounded-md flex-shrink-0 overflow-hidden shadow-lg border border-white/5">
+             <img v-if="album.cover_image" :src="album.cover_image" class="w-full h-full object-cover" />
+             <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-600 to-amber-600">
+               <MusicalNoteIcon class="w-6 h-6 text-white/50" />
+             </div>
+          </div>
+          <div class="min-w-0">
+            <h4 class="font-bold text-sm truncate">{{ album.name }}</h4>
+            <p class="text-xs text-gray-400">Album • {{ album.artist || 'Various Artists' }}</p>
+          </div>
+        </div>
+
+        <!-- User Playlists -->
+        <div 
+          v-for="playlist in playlists" 
+          :key="playlist.id"
+          @click="openPlaylist(playlist)"
+          class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white/5 transition-all group"
+          :class="{ 'bg-white/10': selectedPlaylist?.id === playlist.id }"
+        >
+          <div class="w-12 h-12 bg-gray-800 rounded-md flex-shrink-0 flex items-center justify-center shadow-lg border border-white/5 bg-gradient-to-br from-gray-700 to-black">
+             <FolderIcon class="w-6 h-6 text-gray-400 group-hover:text-white transition-colors" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 class="font-bold text-sm truncate" :class="{ 'text-orange-500': selectedPlaylist?.id === playlist.id }">{{ playlist.name }}</h4>
+            <p class="text-xs text-gray-400">Playlist • {{ currentUser?.name }}</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area (Center/Right Column) -->
+    <main class="flex-1 bg-gradient-to-b from-orange-900/10 to-[#121212] rounded-xl overflow-y-auto custom-scrollbar relative">
+      
+      <!-- Top Filters Sticky -->
+      <div class="sticky top-0 z-20 px-8 py-5 flex items-center gap-3 backdrop-blur-md bg-black/5 flex-shrink-0">
+        <button 
+          @click="activeContent = 'all'"
+          class="px-3 py-1 rounded-full text-sm font-bold transition-all"
+          :class="activeContent === 'all' ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/15'"
+        >All</button>
+        <button 
+          @click="activeContent = 'music'"
+          class="px-3 py-1 rounded-full text-sm font-bold transition-all"
+          :class="activeContent === 'music' ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/15'"
+        >Music</button>
+        <button 
+          class="px-3 py-1 rounded-full text-sm font-bold bg-white/10 text-white hover:bg-white/15 opacity-50 cursor-not-allowed"
+        >Podcasts</button>
+
+        <div class="ml-auto w-64 relative group">
+          <input 
+            v-model="searchQuery"
+            type="text" 
+            placeholder="Search in Library..." 
+            class="w-full bg-white/5 border-none text-white text-sm placeholder-gray-500 rounded-full py-2 pl-10 pr-4 focus:ring-1 focus:ring-white/20 transition-all"
+          />
+          <MagnifyingGlassIcon class="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" />
+        </div>
+      </div>
+
+      <div class="px-8 pb-24 h-full flex flex-col">
+        <!-- Default Content: All Music -->
+        <template v-if="!selectedPlaylist">
+          <div class="flex items-center gap-5 mt-4 mb-8">
+             <div class="w-56 h-56 bg-gradient-to-br from-orange-600 via-orange-500 to-amber-500 rounded-xl shadow-2xl flex items-center justify-center p-8 group relative overflow-hidden">
+                <MusicalNoteIcon class="w-32 h-32 text-white/50 drop-shadow-2xl" />
+                <div class="absolute inset-0 bg-black/10"></div>
+             </div>
+             <div>
+                <p class="text-xs font-bold uppercase tracking-widest text-white/70">Library</p>
+                <h1 class="text-7xl font-black mt-2 mb-6">Liked Songs</h1>
+                <div class="flex items-center gap-2 text-sm font-bold">
+                  <div class="w-6 h-6 bg-orange-500 rounded-full overflow-hidden flex items-center justify-center text-[10px]">W</div>
+                  <span>{{ currentUser?.name }}</span>
+                  <span class="text-gray-400">•</span>
+                  <span>{{ musicList.length }} songs</span>
+                </div>
+             </div>
+          </div>
+
+          <!-- Play/Shuffle Bar -->
+          <div class="flex items-center gap-8 mb-8">
+             <button @click="playMusic(musicList[0])" class="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all shadow-orange-500/20">
+               <PlayIcon class="w-7 h-7 text-white fill-current ml-1" />
+             </button>
+             <button class="text-gray-400 hover:text-white transition-colors">
+               <ArrowsRightLeftIcon class="w-8 h-8" />
+             </button>
+             <button class="text-gray-400 hover:text-white transition-colors">
+               <ArrowDownCircleIcon class="w-8 h-8" />
+             </button>
+             <button class="text-gray-400 hover:text-white transition-colors">
+               <EllipsisHorizontalIcon class="w-8 h-8" />
+             </button>
+          </div>
+
+          <!-- Song List (Spotify Table Style) -->
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="text-gray-400 text-xs uppercase tracking-widest border-b border-white/5">
+                <th class="px-4 py-3 font-medium w-12 text-center">#</th>
+                <th class="px-4 py-3 font-medium">Title</th>
+                <th class="px-4 py-3 font-medium hidden md:table-cell">Album</th>
+                <th class="px-4 py-3 font-medium hidden lg:table-cell text-right"><ClockIcon class="w-4 h-4 inline" /></th>
+                <th class="px-4 py-3 font-medium w-16"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-transparent">
+              <tr 
+                v-for="(song, index) in filteredList" 
+                :key="song.id"
+                class="group hover:bg-white/10 transition-colors rounded-lg overflow-hidden cursor-pointer"
+                @click="playMusic(song)"
+              >
+                <td class="px-4 py-2.5 text-gray-400 text-sm text-center">
+                  <span class="group-hover:hidden">{{ index + 1 }}</span>
+                  <PlayIcon class="w-4 h-4 text-white hidden group-hover:inline ml-auto mr-auto" />
+                </td>
+                <td class="px-4 py-2.5">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gray-800 rounded flex-shrink-0 flex items-center justify-center border border-white/10 group-hover:border-white/20 transition-all">
+                      <MusicalNoteIcon class="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-white truncate group-hover:text-orange-400 transition-colors">{{ song.title }}</p>
+                      <p class="text-xs text-gray-500 truncate group-hover:text-gray-300 transition-colors">WakMusic</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-4 py-2.5 text-sm text-gray-400 hidden md:table-cell">
+                  {{ song.album }}
+                </td>
+                <td class="px-4 py-2.5 text-sm text-gray-400 hidden lg:table-cell text-right font-mono">
+                  3:45
+                </td>
+                <td class="px-4 py-2.5 text-right relative">
+                   <button 
+                     @click.stop="toggleAddMenu(song)"
+                     class="p-2 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-white/10"
+                     title="Add to Playlist"
+                   >
+                     <PlusIcon class="w-5 h-5" />
+                   </button>
+                   
+                   <!-- Mini Add to Playlist Menu -->
+                   <div 
+                     v-if="activeAddMenuSongId === song.id" 
+                     v-click-outside="() => activeAddMenuSongId = null"
+                     class="absolute right-0 top-full mt-2 w-48 bg-[#282828] border border-white/10 rounded-md shadow-2xl z-[50] overflow-hidden"
+                   >
+                      <div class="px-3 py-2 text-xs font-bold text-gray-500 border-b border-white/5 uppercase tracking-wider">Add to Playlist</div>
+                      <div class="max-h-48 overflow-y-auto custom-scrollbar">
+                        <button 
+                          v-for="pl in playlists" 
+                          :key="pl.id"
+                          @click.stop="addToPlaylist(song, pl)"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors truncate"
+                        >
+                          {{ pl.name }}
+                        </button>
+                        <button 
+                          @click.stop="showCreateModal = true; activeAddMenuSongId = null"
+                          class="w-full text-left px-4 py-2 text-sm text-orange-500 hover:bg-white/10 font-bold transition-colors"
+                        >
+                          + Create New
+                        </button>
+                      </div>
+                   </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+
+        <!-- Playlist View -->
+        <template v-else>
+           <div class="flex items-end gap-6 mt-8 mb-8">
+             <div class="w-60 h-60 bg-gradient-to-br from-gray-700 to-black rounded-lg shadow-2xl flex items-center justify-center group relative overflow-hidden">
+                <FolderIcon class="w-32 h-32 text-gray-500" />
+                <div class="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+             </div>
+             <div class="flex-1">
+                <p class="text-xs font-bold uppercase tracking-widest text-white/70">Playlist</p>
+                <h1 class="text-7xl font-black mt-2 mb-6">{{ selectedPlaylist.name }}</h1>
+                <div class="flex items-center gap-2 text-sm font-bold">
+                  <span class="text-orange-500">WakMusic User</span>
+                  <span class="text-gray-400">•</span>
+                  <span>{{ selectedPlaylist.songs.length }} songs</span>
+                </div>
+             </div>
+          </div>
+
+          <div class="flex items-center gap-8 mb-8">
+             <button @click="playPlaylist(selectedPlaylist)" class="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all">
+               <PlayIcon class="w-7 h-7 text-white fill-current ml-1" />
+             </button>
+             <button @click="removeFromPlaylist(0)" class="text-gray-400 hover:text-red-500 transition-colors">
+               <TrashIcon class="w-7 h-7" />
+             </button>
+          </div>
+
+          <table class="w-full text-left">
+             <thead>
+              <tr class="text-gray-400 text-xs uppercase tracking-widest border-b border-white/5">
+                <th class="px-4 py-3 font-medium w-12 text-center">#</th>
+                <th class="px-4 py-3 font-medium">Title</th>
+              </tr>
+             </thead>
+             <tbody>
+              <tr 
+                v-for="(song, index) in selectedPlaylist.songs" 
+                :key="index"
+                class="group hover:bg-white/10 transition-colors cursor-pointer"
+                @click="playMusic(song)"
+              >
+                <td class="px-4 py-3 text-gray-400 text-sm text-center">
+                  <span class="group-hover:hidden">{{ index + 1 }}</span>
+                  <PlayIcon class="w-4 h-4 text-white hidden group-hover:inline" />
+                </td>
+                <td class="px-4 py-3">
+                  <p class="text-sm font-semibold truncate">{{ decodeURIComponent(song.name) }}</p>
+                </td>
+              </tr>
+             </tbody>
+          </table>
+        </template>
+      </div>
+    </main>
+
+    <!-- Create Playlist Modal -->
+    <div v-if="showCreateModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div class="bg-[#282828] rounded-xl border border-white/10 w-full max-w-md p-6 shadow-2xl animate-fade-in-up">
+        <h3 class="text-xl font-bold mb-4">New Playlist</h3>
+        <input 
+          v-model="newPlaylistName"
+          @keyup.enter="createPlaylist"
+          type="text" 
+          placeholder="Give your playlist a name" 
+          class="w-full bg-[#3e3e3e] border-none rounded-md px-4 py-3 text-sm text-white focus:ring-1 focus:ring-white/20 mb-6"
+        />
+        <div class="flex justify-end gap-3">
+          <button @click="showCreateModal = false" class="px-4 py-2 text-sm font-bold text-gray-400 hover:text-white">Cancel</button>
+          <button @click="createPlaylist" :disabled="!newPlaylistName" class="px-6 py-2 bg-white text-black rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-all disabled:opacity-50">
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed, reactive } from 'vue'
+import axios from 'axios'
+import { getMusicList } from '../services/musicService.js'
+import { 
+  MusicalNoteIcon, 
+  PlusIcon, 
+  PlayIcon, 
+  ArrowRightIcon,
+  MagnifyingGlassIcon,
+  Bars3Icon,
+  Squares2X2Icon,
+  FolderIcon,
+  ClockIcon,
+  ArrowsRightLeftIcon,
+  ArrowDownCircleIcon,
+  EllipsisHorizontalIcon,
+  TrashIcon
+} from '@heroicons/vue/24/solid'
+import { addToQueue, playTrack, clearQueue, currentTrack } from '../stores/audioStore.js'
+import { currentUser } from '../stores/authStore.js'
+
+const activeTab = ref('songs')
+const activeContent = ref('all')
+const loading = ref(true)
+const musicList = ref([])
+const albums = ref([])
+const playlists = ref([])
+const searchQuery = ref('')
+const selectedPlaylist = ref(null)
+const showCreateModal = ref(false)
+const newPlaylistName = ref('')
+const activeAddMenuSongId = ref(null)
+
+// Click outside directive implementation
+const vClickOutside = {
+  mounted(el, binding) {
+    el.clickOutsideEvent = (event) => {
+      if (!(el === event.target || el.contains(event.target))) {
+        binding.value(event)
+      }
+    }
+    document.addEventListener('click', el.clickOutsideEvent)
+  },
+  unmounted(el) {
+    document.removeEventListener('click', el.clickOutsideEvent)
+  }
+}
+
+onMounted(async () => {
+  await fetchMusic()
+  await fetchAlbums()
+  loadPlaylists()
+})
+
+const fetchMusic = async () => {
+  loading.value = true
+  try {
+    musicList.value = await getMusicList()
+  } catch (error) {
+    console.error('Failed to fetch music:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchAlbums = async () => {
+  try {
+    const res = await axios.get('/api/albums')
+    albums.value = res.data
+  } catch (err) {
+    console.error('Albums error:', err)
+  }
+}
+
+const loadPlaylists = () => {
+  const saved = localStorage.getItem('wakmusic_playlists')
+  if (saved) playlists.value = JSON.parse(saved)
+}
+
+const savePlaylists = () => {
+  localStorage.setItem('wakmusic_playlists', JSON.stringify(playlists.value))
+}
+
+const filteredList = computed(() => {
+  if (!searchQuery.value) return musicList.value
+  const lowerQuery = searchQuery.value.toLowerCase()
+  return musicList.value.filter(music => music.name.toLowerCase().includes(lowerQuery))
+})
+
+const playMusic = (music) => {
+  addToQueue(music.url)
+}
+
+const toggleAddMenu = (song) => {
+  if (activeAddMenuSongId.value === song.id) {
+    activeAddMenuSongId.value = null
+  } else {
+    activeAddMenuSongId.value = song.id
+  }
+}
+
+const addToPlaylist = (song, playlist) => {
+  const plIndex = playlists.value.findIndex(p => p.id === playlist.id)
+  if (plIndex !== -1) {
+    const existingSongs = playlists.value[plIndex].songs || []
+    const songExists = existingSongs.find(s => s.id === song.id)
+    
+    if (!songExists) {
+      playlists.value[plIndex].songs.push({
+        id: song.id,
+        name: song.title,
+        url: song.url,
+        addedAt: new Date().toISOString()
+      })
+      savePlaylists()
+    }
+  }
+  activeAddMenuSongId.value = null
+}
+
+const createPlaylist = () => {
+  if (!newPlaylistName.value.trim()) return
+  const newPlaylist = {
+    id: Date.now(),
+const playPlaylist = (playlist) => {
+  if (!playlist.songs.length) return
+  clearQueue()
+  playlist.songs.forEach(song => addToQueue(song.url))
+  playTrack(0)
+}
+</script>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 12px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.custom-scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 0.4s ease-out forwards; }
+</style>
