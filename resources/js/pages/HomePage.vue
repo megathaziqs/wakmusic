@@ -49,7 +49,7 @@
         </div>
         
         <p class="text-xl md:text-3xl text-gray-400 max-w-4xl mx-auto leading-relaxed mb-16 font-medium opacity-90 mt-[-4rem] sm:mt-[-8rem] md:mt-[-11rem] lg:mt-[-14rem] relative z-20">
-          Transform YouTube videos into high-quality MP3s instantly. <br class="hidden sm:block"/> Your personal music library, elevated.
+          Transform YouTube videos into high-quality MP3s instantly. <br class="hidden sm:block"/> Your personal music library, elevated hahahha.
         </p>
 
         <!-- Convert Input Section -->
