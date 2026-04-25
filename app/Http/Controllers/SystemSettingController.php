@@ -8,13 +8,56 @@ use Illuminate\Support\Facades\Storage;
 
 class SystemSettingController extends Controller
 {
+    private function normalizeSettingValue(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        // Keep external URLs untouched, but persist app files as relative paths.
+        if (preg_match('/^https?:\/\//i', $value)) {
+            $appUrl = rtrim(config('app.url', ''), '/');
+            if ($appUrl !== '' && str_starts_with($value, $appUrl . '/')) {
+                return ltrim(substr($value, strlen($appUrl)), '/');
+            }
+
+            return $value;
+        }
+
+        return ltrim($value, '/');
+    }
+
+    private function resolveSettingAssetUrl(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        if (preg_match('/^https?:\/\//i', $value)) {
+            return $value;
+        }
+
+        return asset(ltrim($value, '/'));
+    }
+
     public function index()
     {
         $settings = SystemSetting::all()->pluck('value', 'key');
-        
-        // Add default values if not present
-        if (!isset($settings['app_name'])) $settings['app_name'] = 'WakMusic';
-        
+
+        // Add default values if not present.
+        if (!isset($settings['app_name'])) {
+            $settings['app_name'] = 'WakMusic';
+        }
+        if (!isset($settings['hero_background'])) {
+            $settings['hero_background'] = 'brand/hero_bg.jpg';
+        }
+
+        foreach (['brand_logo', 'brand_text', 'hero_background'] as $assetKey) {
+            if (isset($settings[$assetKey])) {
+                $settings[$assetKey] = $this->resolveSettingAssetUrl($settings[$assetKey]);
+            }
+        }
+
         return response()->json($settings);
     }
 
@@ -25,7 +68,7 @@ class SystemSettingController extends Controller
         foreach ($data as $key => $value) {
             SystemSetting::updateOrCreate(
                 ['key' => $key],
-                ['value' => $value]
+                ['value' => $this->normalizeSettingValue($value)]
             );
         }
 
@@ -43,17 +86,17 @@ class SystemSettingController extends Controller
             $file = $request->file('logo');
             $extension = $file->getClientOriginalExtension();
             $filename = $request->type . '_' . time() . '.' . $extension;
-            
+
             // Store directly in public/brand
             $file->move(public_path('brand'), $filename);
-            $url = asset('brand/' . $filename);
+            $relativePath = 'brand/' . $filename;
 
             SystemSetting::updateOrCreate(
                 ['key' => $request->type],
-                ['value' => $url]
+                ['value' => $relativePath]
             );
 
-            return response()->json(['url' => $url]);
+            return response()->json(['url' => asset($relativePath)]);
         }
 
         return response()->json(['message' => 'Upload failed'], 400);

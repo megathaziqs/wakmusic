@@ -85,7 +85,8 @@ class MusicController extends Controller
             mkdir($storageFolder, 0755, true);
         }
 
-        $ffmpegPath = "C:\\ffmpeg\\bin"; // adjust ikut install
+        // Allow per-machine configuration and fall back to PATH binaries.
+        $ffmpegPath = env('FFMPEG_PATH');
 
         // Temp log file
         $logFile = storage_path("app/public/music/convert_progress.txt");
@@ -124,12 +125,20 @@ class MusicController extends Controller
             );
 
             if ($format === 'mp4') {
-                $cmd = "yt-dlp -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\" --embed-metadata --embed-thumbnail --ffmpeg-location \"{$ffmpegPath}\" --no-playlist "
+                $cmd = "yt-dlp -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\" --embed-metadata --embed-thumbnail ";
+                if (!empty($ffmpegPath)) {
+                    $cmd .= "--ffmpeg-location " . escapeshellarg($ffmpegPath) . " ";
+                }
+                $cmd .= "--no-playlist "
                     . escapeshellarg($info['webpage_url'])
                     . " -o " . escapeshellarg($outputPath)
                     . " 2>&1";
             } else {
-                $cmd = "yt-dlp -x --audio-format mp3 --embed-metadata --embed-thumbnail --parse-metadata \"%(uploader)s:%(album)s\" --ffmpeg-location \"{$ffmpegPath}\" --no-playlist "
+                $cmd = "yt-dlp -x --audio-format mp3 --embed-metadata --embed-thumbnail --parse-metadata \"%(uploader)s:%(album)s\" ";
+                if (!empty($ffmpegPath)) {
+                    $cmd .= "--ffmpeg-location " . escapeshellarg($ffmpegPath) . " ";
+                }
+                $cmd .= "--no-playlist "
                     . escapeshellarg($info['webpage_url'])
                     . " -o " . escapeshellarg($outputPath)
                     . " 2>&1";
