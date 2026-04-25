@@ -46,7 +46,13 @@ class SystemSettingController extends Controller
 
         // Add default values if not present.
         if (!isset($settings['app_name'])) {
-            $settings['app_name'] = 'WakMusic';
+            $settings['app_name'] = config('app.name', 'WakMusic');
+        }
+        if (!isset($settings['brand_logo'])) {
+            $settings['brand_logo'] = 'brand/brand_logo_1767754045.svg';
+        }
+        if (!isset($settings['brand_text'])) {
+            $settings['brand_text'] = 'brand/brand_text_1767754037.svg';
         }
         if (!isset($settings['hero_background'])) {
             $settings['hero_background'] = 'brand/hero_bg.jpg';
@@ -85,9 +91,12 @@ class SystemSettingController extends Controller
         if ($request->hasFile('logo')) {
             $file = $request->file('logo');
             $extension = $file->getClientOriginalExtension();
-            $filename = $request->type . '_' . time() . '.' . $extension;
+            $filename = $request->type . '.' . $extension;
 
             // Store directly in public/brand
+            if (!is_dir(public_path('brand'))) {
+                mkdir(public_path('brand'), 0755, true);
+            }
             $file->move(public_path('brand'), $filename);
             $relativePath = 'brand/' . $filename;
 
