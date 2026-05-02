@@ -7,8 +7,15 @@ use App\Http\Controllers\SystemSettingController;
 
 Route::get('/music-list', [MusicController::class, 'list']);
 Route::post('/convert', [MusicController::class, 'convert']);
+Route::post('/convert-file', [MusicController::class, 'uploadVideo']);
+Route::post('/convert-source-url', [MusicController::class, 'convertSourceUrl']);
 Route::post('/upload-video', [MusicController::class, 'uploadVideo']);
-Route::post('/video-info', [MusicController::class, 'getInfo']);
+Route::get('/upload-video', function () {
+    return response()->json([
+        'message' => 'This endpoint accepts POST uploads only. Use the dashboard upload form to send multipart form data.'
+    ], 405)->header('Allow', 'POST');
+});
+Route::match(['get', 'post'], '/video-info', [MusicController::class, 'getInfo']);
 Route::get('/convert-progress', [MusicController::class, 'progress']);
 Route::delete('/music/{filename}', [MusicController::class, 'delete']);
 Route::post('/music/rename', [MusicController::class, 'rename']);
@@ -27,4 +34,3 @@ Route::delete('/albums/{album}', [AlbumController::class, 'destroy']);
 Route::get('/settings', [SystemSettingController::class, 'index']);
 Route::post('/settings', [SystemSettingController::class, 'update']);
 Route::post('/settings/upload', [SystemSettingController::class, 'uploadLogo']);
-

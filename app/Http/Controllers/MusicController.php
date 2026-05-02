@@ -10,6 +10,159 @@ use App\Models\Album;
 
 class MusicController extends Controller
 {
+    private const UPLOAD_VIDEO_MAX_KILOBYTES = 512000;
+    private const UPLOAD_VIDEO_MAX_MEGABYTES = 500;
+
+    private function getBinaryCommand(string $envKey, string $default): string
+    {
+        $customPath = env($envKey);
+        if (!empty($customPath)) {
+            return escapeshellarg($customPath);
+        }
+
+        return $default;
+    }
+
+    private function getFfmpegToolCommand(string $binary): string
+    {
+        $ffmpegPath = env('FFMPEG_PATH');
+        if (empty($ffmpegPath)) {
+            return $binary;
+        }
+
+        $normalizedPath = rtrim($ffmpegPath, "\\/");
+        $binaryName = $binary . (str_ends_with(strtolower($binary), '.exe') ? '' : '.exe');
+
+        if (is_dir($normalizedPath)) {
+            $candidate = $normalizedPath . DIRECTORY_SEPARATOR . $binaryName;
+            if (is_file($candidate)) {
+                return escapeshellarg($candidate);
+            }
+        }
+
+        if (is_file($normalizedPath)) {
+            if (strtolower(pathinfo($normalizedPath, PATHINFO_FILENAME)) === strtolower(pathinfo($binary, PATHINFO_FILENAME))) {
+                return escapeshellarg($normalizedPath);
+            }
+
+            $candidate = dirname($normalizedPath) . DIRECTORY_SEPARATOR . $binaryName;
+            if (is_file($candidate)) {
+                return escapeshellarg($candidate);
+            }
+        }
+
+        return $binary;
+    }
+
+    private function isCommandAvailable(string $command): bool
+    {
+        exec($command . " --version 2>&1", $output, $returnCode);
+        return $returnCode === 0;
+    }
+
+    private function safeTitle(string $title, string $fallbackPrefix = 'converted-video'): string
+    {
+        $safeTitle = preg_replace('/[^\w\- ]+/', '', $title);
+        $safeTitle = trim((string) $safeTitle);
+        $safeTitle = mb_substr($safeTitle, 0, 100);
+
+        return $safeTitle !== '' ? $safeTitle : $fallbackPrefix . '-' . now()->format('Ymd-His');
+    }
+
+    private function convertedStorageFolder(): string
+    {
+        $storageFolder = storage_path("app/public/music/converted");
+        if (!file_exists($storageFolder)) {
+            mkdir($storageFolder, 0755, true);
+        }
+
+        return $storageFolder;
+    }
+
+    private function tempConverterFolder(): string
+    {
+        $tempFolder = storage_path("app/temp/converter");
+        if (!file_exists($tempFolder)) {
+            mkdir($tempFolder, 0755, true);
+        }
+
+        return $tempFolder;
+    }
+
+    private function mediaContentType(string $filename): string
+    {
+        return match (strtolower(pathinfo($filename, PATHINFO_EXTENSION))) {
+            'mp4' => 'video/mp4',
+            default => 'audio/mpeg',
+        };
+    }
+
+    private function buildFfmpegConvertCommand(string $ffmpeg, string $inputPath, string $outputPath, string $format): string
+    {
+        if ($format === 'mp4') {
+            return $ffmpeg . " -y -i " . escapeshellarg($inputPath)
+                . " -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 192k -movflags +faststart "
+                . escapeshellarg($outputPath)
+                . " 2>&1";
+        }
+
+        return $ffmpeg . " -y -i " . escapeshellarg($inputPath)
+            . " -vn -ar 44100 -ac 2 -b:a 192k "
+            . escapeshellarg($outputPath)
+            . " 2>&1";
+    }
+
+    private function convertLocalVideoSource(
+        string $videoPath,
+        string $title,
+        string $sourceLabel,
+        ?string $albumId,
+        string $format
+    ): array {
+        $safeTitle = $this->safeTitle($title);
+        $ext = $format === 'mp4' ? 'mp4' : 'mp3';
+        $storageFolder = $this->convertedStorageFolder();
+        $outputPath = $storageFolder . DIRECTORY_SEPARATOR . $safeTitle . '.' . $ext;
+        $publicPath = "music/converted/{$safeTitle}.{$ext}";
+        $ffmpeg = $this->getFfmpegToolCommand('ffmpeg');
+        $ffprobe = $this->getFfmpegToolCommand('ffprobe');
+
+        if (!$this->isCommandAvailable($ffmpeg) || !$this->isCommandAvailable($ffprobe)) {
+            throw new \RuntimeException('ffmpeg or ffprobe is not available. Install ffmpeg or set FFMPEG_PATH in your .env.');
+        }
+
+        $ffprobeCmd = $ffprobe . " -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($videoPath);
+        $duration = (int) shell_exec($ffprobeCmd);
+        $ffmpegCmd = $this->buildFfmpegConvertCommand($ffmpeg, $videoPath, $outputPath, $format);
+
+        exec($ffmpegCmd, $output, $returnCode);
+
+        if ($returnCode !== 0) {
+            throw new \RuntimeException('Conversion failed: ' . implode("\n", array_slice($output, -8)));
+        }
+
+        if (!file_exists($outputPath)) {
+            throw new \RuntimeException('Output file was not created.');
+        }
+
+        $song = Song::firstOrCreate(
+            ['file_path' => $publicPath],
+            [
+                'title' => $safeTitle,
+                'source_url' => mb_substr($sourceLabel, 0, 255),
+                'duration' => $duration,
+                'album_id' => $albumId,
+            ]
+        );
+
+        return [
+            'id' => $song->id,
+            'name' => $safeTitle . '.' . $ext,
+            'url' => asset("storage/music/converted/" . rawurlencode($safeTitle . '.' . $ext)),
+            'download_url' => route('music.download', ['filename' => $safeTitle . '.' . $ext]),
+        ];
+    }
+
     // Helper to clean YouTube URL
     private function cleanYoutubeUrl($url)
     {
@@ -44,9 +197,18 @@ class MusicController extends Controller
         ]);
 
         $url = $this->cleanYoutubeUrl($request->input('url'));
+        $ytDlp = $this->getBinaryCommand('YTDLP_PATH', 'yt-dlp');
 
-        // Ambil info video guna yt-dlp
-        $command = "yt-dlp -j " . escapeshellarg($url);
+        if (!$this->isCommandAvailable($ytDlp)) {
+            return response()->json([
+                'error' => 'yt-dlp is not available. Install yt-dlp or set YTDLP_PATH in your .env.'
+            ], 500);
+        }
+
+        // Ambil info video guna yt-dlp.
+        // On some Windows setups yt-dlp may print extra warning lines,
+        // so we later extract the first valid JSON line.
+        $command = $ytDlp . " --dump-single-json --no-playlist --skip-download " . escapeshellarg($url) . " 2>&1";
         $jsonOutput = shell_exec($command);
         
         if (!$jsonOutput) {
@@ -55,14 +217,45 @@ class MusicController extends Controller
 
         $info = json_decode($jsonOutput, true);
         if (!$info) {
-            return response()->json(['error' => 'Invalid video info'], 500);
+            $lines = preg_split('/\r\n|\r|\n/', trim($jsonOutput));
+            foreach ($lines as $line) {
+                if (empty(trim($line))) {
+                    continue;
+                }
+                $candidate = json_decode($line, true);
+                if (is_array($candidate) && !empty($candidate['id'])) {
+                    $info = $candidate;
+                    break;
+                }
+            }
+        }
+
+        if (!$info) {
+            return response()->json([
+                'error' => 'Invalid video info',
+                'debug' => mb_substr($jsonOutput, 0, 300),
+            ], 500);
+        }
+
+        $thumbnail = $info['thumbnail'] ?? null;
+        if (empty($thumbnail) && !empty($info['thumbnails']) && is_array($info['thumbnails'])) {
+            $lastThumb = end($info['thumbnails']);
+            if (is_array($lastThumb) && !empty($lastThumb['url'])) {
+                $thumbnail = $lastThumb['url'];
+            }
+        }
+
+        $videoId = $info['id'] ?? null;
+        if (empty($thumbnail) && !empty($videoId)) {
+            $thumbnail = 'https://i.ytimg.com/vi/' . $videoId . '/hqdefault.jpg';
         }
 
         return response()->json([
             'title' => $info['title'] ?? 'Unknown Title',
-            'thumbnail' => $info['thumbnail'] ?? null,
+            'thumbnail' => $thumbnail,
             'duration' => $info['duration'] ?? 0,
             'uploader' => $info['uploader'] ?? 'Unknown Uploader',
+            'video_id' => $videoId,
             'cleaned_url' => $url
         ]);
     }
@@ -79,21 +272,24 @@ class MusicController extends Controller
         $url = $this->cleanYoutubeUrl($request->input('url'));
         $albumId = $request->input('album_id');
         $format = $request->input('format', 'mp3');
-        $storageFolder = storage_path("app/public/music/converted");
-        
-        if (!file_exists($storageFolder)) {
-            mkdir($storageFolder, 0755, true);
-        }
+        $ytDlp = $this->getBinaryCommand('YTDLP_PATH', 'yt-dlp');
+        $storageFolder = $this->convertedStorageFolder();
 
         // Allow per-machine configuration and fall back to PATH binaries.
         $ffmpegPath = env('FFMPEG_PATH');
+
+        if (!$this->isCommandAvailable($ytDlp)) {
+            return response()->json([
+                'error' => 'yt-dlp is not available. Install yt-dlp or set YTDLP_PATH in your .env.'
+            ], 500);
+        }
 
         // Temp log file
         $logFile = storage_path("app/public/music/convert_progress.txt");
         file_put_contents($logFile, "Starting conversion...\n");
 
         // Ambil info video
-        $jsonOutput = shell_exec("yt-dlp -j " . escapeshellarg($url));
+        $jsonOutput = shell_exec($ytDlp . " -j " . escapeshellarg($url) . " 2>&1");
         if (!$jsonOutput) {
             return response()->json(['error' => 'Failed to get video info'], 500);
         }
@@ -125,7 +321,7 @@ class MusicController extends Controller
             );
 
             if ($format === 'mp4') {
-                $cmd = "yt-dlp -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\" --embed-metadata --embed-thumbnail ";
+                $cmd = $ytDlp . " -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\" --embed-metadata --embed-thumbnail ";
                 if (!empty($ffmpegPath)) {
                     $cmd .= "--ffmpeg-location " . escapeshellarg($ffmpegPath) . " ";
                 }
@@ -134,7 +330,7 @@ class MusicController extends Controller
                     . " -o " . escapeshellarg($outputPath)
                     . " 2>&1";
             } else {
-                $cmd = "yt-dlp -x --audio-format mp3 --embed-metadata --embed-thumbnail --parse-metadata \"%(uploader)s:%(album)s\" ";
+                $cmd = $ytDlp . " -x --audio-format mp3 --embed-metadata --embed-thumbnail --parse-metadata \"%(uploader)s:%(album)s\" ";
                 if (!empty($ffmpegPath)) {
                     $cmd .= "--ffmpeg-location " . escapeshellarg($ffmpegPath) . " ";
                 }
@@ -186,65 +382,135 @@ class MusicController extends Controller
     public function uploadVideo(Request $request)
     {
         $request->validate([
-            'video' => 'required|file|mimes:mp4,mkv,avi,mov,flv,wmv|max:512000', // 500MB limit
-            'album_id' => 'nullable|exists:albums,id'
+            'video' => 'required|file|mimes:mp4,mkv,avi,mov,flv,wmv,webm,m4v|max:' . self::UPLOAD_VIDEO_MAX_KILOBYTES,
+            'album_id' => 'nullable|exists:albums,id',
+            'format' => ['sometimes', 'in:mp3,mp4'],
+        ], [
+            'video.max' => 'The selected video must not be larger than ' . self::UPLOAD_VIDEO_MAX_MEGABYTES . ' MB.'
         ]);
 
         $videoFile = $request->file('video');
         $videoPath = $videoFile->getRealPath();
         $originalName = pathinfo($videoFile->getClientOriginalName(), PATHINFO_FILENAME);
-        $safeTitle = preg_replace('/[^\w\- ]+/', '', $originalName);
-        $safeTitle = mb_substr($safeTitle, 0, 100);
+        $format = $request->input('format', 'mp3');
 
-        $storageFolder = storage_path("app/public/music/converted");
-        if (!file_exists($storageFolder)) {
-            mkdir($storageFolder, 0755, true);
-        }
-
-        $outputPath = $storageFolder . DIRECTORY_SEPARATOR . $safeTitle . '.mp3';
-        $publicPath = "music/converted/{$safeTitle}.mp3";
-
-        // Get duration using ffprobe
-        $ffprobeCmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($videoPath);
-        $duration = (int) shell_exec($ffprobeCmd);
-
-        // Convert using ffmpeg
-        // We use absolute path for output to avoid issues
-        $ffmpegCmd = "ffmpeg -y -i " . escapeshellarg($videoPath) . " -vn -ar 44100 -ac 2 -b:a 192k " . escapeshellarg($outputPath) . " 2>&1";
-        
-        exec($ffmpegCmd, $output, $returnCode);
-
-        if ($returnCode !== 0) {
-            return response()->json([
-                'error' => 'Conversion failed', 
-                'details' => $output,
-                'command' => $ffmpegCmd
-            ], 500);
-        }
-
-        if (file_exists($outputPath)) {
-            $song = Song::firstOrCreate(
-                ['file_path' => $publicPath],
-                [
-                    'title' => $safeTitle,
-                    'source_url' => 'Uploaded Video',
-                    'duration' => $duration,
-                    'album_id' => $request->input('album_id'),
-                ]
+        try {
+            $song = $this->convertLocalVideoSource(
+                $videoPath,
+                $originalName,
+                'Computer Video',
+                $request->input('album_id'),
+                $format
             );
 
             return response()->json([
                 'success' => true,
-                'song' => [
-                    'id' => $song->id,
-                    'name' => $safeTitle . '.mp3',
-                    'url' => asset("storage/music/converted/" . rawurlencode($safeTitle . '.mp3')),
-                    'download_url' => route('music.download', ['filename' => $safeTitle . '.mp3'])
-                ]
+                'song' => $song,
             ]);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function convertSourceUrl(Request $request)
+    {
+        $request->validate([
+            'url' => ['required', 'url'],
+            'album_id' => ['nullable', 'exists:albums,id'],
+            'format' => ['sometimes', 'in:mp3,mp4'],
+        ]);
+
+        $url = $request->input('url');
+        $albumId = $request->input('album_id');
+        $format = $request->input('format', 'mp3');
+        $ytDlp = $this->getBinaryCommand('YTDLP_PATH', 'yt-dlp');
+
+        if (!$this->isCommandAvailable($ytDlp)) {
+            return response()->json([
+                'error' => 'yt-dlp is not available. Install yt-dlp or set YTDLP_PATH in your .env.'
+            ], 500);
         }
 
-        return response()->json(['error' => 'Output file was not created'], 500);
+        $logFile = storage_path("app/public/music/convert_progress.txt");
+        file_put_contents($logFile, "Fetching source video...\n");
+
+        $title = 'cloud-video-' . now()->format('Ymd-His');
+        $infoOutput = shell_exec($ytDlp . " --dump-single-json --no-playlist --skip-download " . escapeshellarg($url) . " 2>&1");
+        if ($infoOutput) {
+            $info = json_decode($infoOutput, true);
+            if (is_array($info) && !empty($info['title'])) {
+                $title = $info['title'];
+            }
+        }
+
+        $tempFolder = $this->tempConverterFolder();
+        $tempPrefix = 'source-' . uniqid('', true);
+        $tempTemplate = $tempFolder . DIRECTORY_SEPARATOR . $tempPrefix . '.%(ext)s';
+        $downloadCmd = $ytDlp
+            . " --no-playlist --max-filesize " . escapeshellarg(self::UPLOAD_VIDEO_MAX_MEGABYTES . 'M')
+            . " -o " . escapeshellarg($tempTemplate)
+            . " --print after_move:filepath "
+            . escapeshellarg($url)
+            . " 2>&1";
+        exec($downloadCmd, $downloadOutput, $downloadCode);
+
+        if ($downloadCode !== 0) {
+            foreach (glob($tempFolder . DIRECTORY_SEPARATOR . $tempPrefix . '.*') ?: [] as $partialPath) {
+                if (is_file($partialPath)) {
+                    unlink($partialPath);
+                }
+            }
+
+            return response()->json([
+                'error' => 'Failed to fetch the source video. Make sure the Google Drive file is shared publicly, under 500 MB, or use a direct video link.',
+                'details' => array_slice($downloadOutput, -8),
+            ], 500);
+        }
+
+        $downloadedPath = null;
+        foreach (array_reverse($downloadOutput) as $line) {
+            $candidate = trim($line, "\" \t\n\r\0\x0B");
+            if ($candidate !== '' && file_exists($candidate)) {
+                $downloadedPath = $candidate;
+                break;
+            }
+        }
+
+        if (!$downloadedPath) {
+            $matches = glob($tempFolder . DIRECTORY_SEPARATOR . $tempPrefix . '.*');
+            $downloadedPath = $matches[0] ?? null;
+        }
+
+        if (!$downloadedPath || !file_exists($downloadedPath)) {
+            foreach (glob($tempFolder . DIRECTORY_SEPARATOR . $tempPrefix . '.*') ?: [] as $partialPath) {
+                if (is_file($partialPath)) {
+                    unlink($partialPath);
+                }
+            }
+
+            return response()->json(['error' => 'Downloaded source file was not found.'], 500);
+        }
+
+        try {
+            file_put_contents($logFile, "Converting source video to {$format}...\n", FILE_APPEND);
+            $song = $this->convertLocalVideoSource($downloadedPath, $title, $url, $albumId, $format);
+            file_put_contents($logFile, "Conversion finished.\n", FILE_APPEND);
+
+            return response()->json([
+                'success' => true,
+                'song' => $song,
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
+        } finally {
+            if (file_exists($downloadedPath)) {
+                unlink($downloadedPath);
+            }
+        }
     }
 
     // Poll progress (GET request, tanpa validation url)
@@ -442,7 +708,7 @@ class MusicController extends Controller
         }
 
         return response()->download($path, $safeName, [
-            'Content-Type' => 'audio/mpeg',
+            'Content-Type' => $this->mediaContentType($safeName),
             'Cache-Control' => 'no-cache, must-revalidate',
         ]);
     }

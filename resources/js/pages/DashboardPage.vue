@@ -82,17 +82,17 @@
 
           <!-- Quick Actions -->
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button @click="currentModule = 'converter'; converterMode = 'youtube'" class="flex flex-col items-center justify-center p-6 bg-orange-600/10 border border-orange-500/20 rounded-2xl hover:bg-orange-600/20 transition-all group">
+            <button @click="currentModule = 'converter'; setConverterMode('url')" class="flex flex-col items-center justify-center p-6 bg-orange-600/10 border border-orange-500/20 rounded-2xl hover:bg-orange-600/20 transition-all group">
               <div class="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center mb-3 shadow-lg shadow-orange-500/20 group-hover:scale-110 transition-transform">
                 <BoltIcon class="w-6 h-6 text-white" />
               </div>
               <span class="text-sm font-bold text-orange-200">Convert Link</span>
             </button>
-            <button @click="currentModule = 'converter'; converterMode = 'upload'" class="flex flex-col items-center justify-center p-6 bg-blue-600/10 border border-blue-500/20 rounded-2xl hover:bg-blue-600/20 transition-all group">
+            <button @click="currentModule = 'converter'; setConverterMode('source')" class="flex flex-col items-center justify-center p-6 bg-blue-600/10 border border-blue-500/20 rounded-2xl hover:bg-blue-600/20 transition-all group">
               <div class="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center mb-3 shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
                 <PlusCircleIcon class="w-6 h-6 text-white" />
               </div>
-              <span class="text-sm font-bold text-blue-200">Upload Video</span>
+              <span class="text-sm font-bold text-blue-200">Video Source</span>
             </button>
             <button @click="openAlbumModal()" class="flex flex-col items-center justify-center p-6 bg-amber-600/10 border border-amber-500/20 rounded-2xl hover:bg-amber-600/20 transition-all group">
               <div class="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center mb-3 shadow-lg shadow-amber-500/20 group-hover:scale-110 transition-transform">
@@ -216,179 +216,239 @@
         </div>
 
         <!-- MODULE: CONVERTER -->
-        <div v-if="currentModule === 'converter'" class="animate-fade-in max-w-4xl mx-auto pt-10">
-           <div class="text-center mb-10">
-              <h2 class="text-4xl font-bold text-white mb-3">Quick Converter</h2>
-              <p class="text-gray-400">Transform YouTube videos into high-quality MP3s instantly.</p>
+        <div v-if="currentModule === 'converter'" class="animate-fade-in max-w-5xl mx-auto pt-6 space-y-6">
+           <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+              <div>
+                 <h2 class="text-4xl font-black text-white tracking-tight">Converter</h2>
+                 <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-widest">
+                    <span class="px-3 py-1 rounded-full bg-orange-500/15 text-orange-200 border border-orange-500/20">URL</span>
+                    <span class="px-3 py-1 rounded-full bg-sky-500/15 text-sky-200 border border-sky-500/20">Computer</span>
+                    <span class="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-200 border border-emerald-500/20">Drive</span>
+                 </div>
+              </div>
+              <div class="grid grid-cols-3 gap-3 text-center">
+                 <div class="bg-gray-900/60 border border-white/10 rounded-xl px-4 py-3">
+                    <p class="text-[10px] text-gray-500 font-black uppercase tracking-widest">Output</p>
+                    <p class="text-white font-bold">{{ selectedFormat.toUpperCase() }}</p>
+                 </div>
+                 <div class="bg-gray-900/60 border border-white/10 rounded-xl px-4 py-3">
+                    <p class="text-[10px] text-gray-500 font-black uppercase tracking-widest">Limit</p>
+                    <p class="text-white font-bold">{{ MAX_UPLOAD_SIZE_MB }} MB</p>
+                 </div>
+                 <div class="bg-gray-900/60 border border-white/10 rounded-xl px-4 py-3">
+                    <p class="text-[10px] text-gray-500 font-black uppercase tracking-widest">Mode</p>
+                    <p class="text-white font-bold">{{ converterMode === 'url' ? 'URL' : 'Source' }}</p>
+                 </div>
+              </div>
            </div>
 
-           <div class="bg-gray-800/50 border border-white/10 rounded-3xl p-8 backdrop-blur-md shadow-2xl relative overflow-hidden">
-             <!-- Abstract decoration -->
-             <div class="absolute -top-24 -right-24 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl pointer-events-none"></div>
+           <div class="bg-gray-900/70 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+              <div class="grid grid-cols-2 border-b border-white/10">
+                 <button
+                   @click="setConverterMode('url')"
+                   class="h-16 flex items-center justify-center gap-3 text-sm font-black uppercase tracking-widest transition-all"
+                   :class="converterMode === 'url' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'"
+                 >
+                   <LinkIcon class="w-5 h-5" />
+                   URL
+                 </button>
+                 <button
+                   @click="setConverterMode('source')"
+                   class="h-16 flex items-center justify-center gap-3 text-sm font-black uppercase tracking-widest transition-all"
+                   :class="converterMode === 'source' ? 'bg-sky-600 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'"
+                 >
+                   <VideoCameraIcon class="w-5 h-5" />
+                   Video Source
+                 </button>
+              </div>
 
-             <div class="relative z-10 flex flex-col gap-6">
-                <!-- Mode Switcher -->
-                <div class="flex gap-2 p-1.5 bg-gray-900/40 rounded-2xl w-fit border border-white/5">
-                   <button 
-                     @click="converterMode = 'youtube'"
-                     :class="converterMode === 'youtube' ? 'bg-orange-600/90 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'"
-                     class="px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                   >
-                     YouTube URL
-                   </button>
-                   <button 
-                     @click="converterMode = 'upload'"
-                     :class="converterMode === 'upload' ? 'bg-orange-600/90 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'"
-                     class="px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                   >
-                     Upload Video
-                   </button>
-                </div>
+              <div class="p-5 sm:p-7 space-y-6">
+                 <div v-if="converterMode === 'url'" class="space-y-3 animate-fade-in">
+                    <label for="converter-url" class="text-xs font-black text-gray-500 uppercase tracking-widest">Paste URL</label>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                       <div class="relative flex-1 group">
+                          <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                             <BoltIcon class="h-5 w-5 text-gray-500 group-focus-within:text-orange-400 transition-colors" />
+                          </div>
+                          <input 
+                            id="converter-url"
+                            v-model="youtubeUrl"
+                            type="text" 
+                            placeholder="https://youtube.com/..."
+                            class="w-full h-14 bg-gray-950/70 border border-gray-700 rounded-xl pl-11 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all font-medium"
+                            @keyup.enter.prevent="convertVideo"
+                          />
+                       </div>
+                       <button 
+                          @click="convertVideo"
+                          :disabled="converting || fetchingPreview || !youtubeUrl"
+                          class="h-14 px-7 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                       >
+                          <span v-if="converting || fetchingPreview" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                          <span>{{ (converting || fetchingPreview) ? 'Converting' : `Convert ${selectedFormat.toUpperCase()}` }}</span>
+                       </button>
+                    </div>
+                 </div>
 
-                <!-- YouTube Input -->
-                <div v-if="converterMode === 'youtube'" class="flex flex-col gap-2 animate-fade-in">
-                   <label class="text-sm font-bold text-gray-300 uppercase tracking-wider ml-1">YouTube URL</label>
-                   <div class="flex gap-3">
-                      <div class="relative flex-1 group">
-                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <BoltIcon class="h-5 w-5 text-gray-500 group-focus-within:text-orange-500 transition-colors" />
-                         </div>
-                         <input 
-                           v-model="youtubeUrl"
-                           type="text" 
-                           placeholder="Paste link here..."
-                           class="w-full bg-gray-900/60 border border-gray-700 rounded-xl pl-11 pr-4 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all font-medium"
-                           @keyup.enter="convertVideo"
-                         />
-                      </div>
-                      <button 
-                         @click="convertVideo"
-                         :disabled="converting || fetchingPreview || !youtubeUrl"
-                         class="px-8 py-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-orange-500/25 transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
-                      >
-                         <span v-if="converting || fetchingPreview" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                         <span>{{ (converting || fetchingPreview) ? 'Processing...' : 'Convert' }}</span>
-                      </button>
-                   </div>
-                </div>
+                 <div v-else class="space-y-5 animate-fade-in">
+                    <div class="grid grid-cols-2 gap-2 bg-gray-950/70 border border-gray-800 rounded-xl p-1.5">
+                       <button
+                         @click="setSourceMode('file')"
+                         class="h-11 flex items-center justify-center gap-2 rounded-lg font-bold text-sm transition-all"
+                         :class="sourceMode === 'file' ? 'bg-sky-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'"
+                       >
+                         <ComputerDesktopIcon class="w-5 h-5" />
+                         Computer
+                       </button>
+                       <button
+                         @click="setSourceMode('cloud')"
+                         class="h-11 flex items-center justify-center gap-2 rounded-lg font-bold text-sm transition-all"
+                         :class="sourceMode === 'cloud' ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'"
+                       >
+                         <CloudArrowUpIcon class="w-5 h-5" />
+                         Google Drive
+                       </button>
+                    </div>
 
-                <!-- Upload Input -->
-                <div v-else class="flex flex-col gap-2 animate-fade-in">
-                   <label class="text-sm font-bold text-gray-300 uppercase tracking-wider ml-1">Select Video File (.mp4, .mkv, .avi)</label>
-                   <div class="flex gap-3">
-                      <div class="relative flex-1 group">
-                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <PlusCircleIcon class="h-5 w-5 text-gray-500 group-focus-within:text-orange-500 transition-colors" />
-                         </div>
-                         <input 
-                           type="file" 
-                           accept="video/*"
-                           @change="handleFileSelect"
-                           class="w-full bg-gray-900/60 border border-gray-700 rounded-xl pl-11 pr-4 py-3.5 text-white file:hidden cursor-pointer focus:outline-none focus:border-orange-500 transition-all"
-                         />
-                         <div class="absolute inset-y-0 left-11 flex items-center pointer-events-none text-gray-400 font-medium">
-                            {{ selectedVideoFile ? selectedVideoFile.name : 'Choose a video file...' }}
-                         </div>
-                      </div>
-                      <button 
-                         @click="uploadVideo"
-                         :disabled="converting || !selectedVideoFile"
-                         class="px-8 py-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-orange-500/25 transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
-                      >
-                         <span v-if="converting" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                         <span>{{ converting ? 'Converting...' : 'Upload & Convert' }}</span>
-                      </button>
-                   </div>
-                </div>
+                    <div v-if="sourceMode === 'file'" class="space-y-3">
+                       <label for="source-file" class="text-xs font-black text-gray-500 uppercase tracking-widest">Computer Video</label>
+                       <div class="flex flex-col sm:flex-row gap-3">
+                          <div class="relative flex-1 group">
+                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <PlusCircleIcon class="h-5 w-5 text-gray-500 group-focus-within:text-sky-400 transition-colors" />
+                             </div>
+                             <input 
+                               id="source-file"
+                               :key="fileInputKey"
+                               type="file" 
+                               accept="video/*"
+                               @change="handleFileSelect"
+                               class="w-full h-14 bg-gray-950/70 border border-gray-700 rounded-xl pl-11 pr-4 text-white file:hidden cursor-pointer focus:outline-none focus:border-sky-500 transition-all"
+                             />
+                             <div class="absolute inset-y-0 left-11 right-4 flex items-center pointer-events-none text-gray-400 font-medium truncate">
+                                {{ selectedVideoFile ? `${selectedVideoFile.name} - ${formatFileSize(selectedVideoFile.size)}` : 'Choose video file' }}
+                             </div>
+                          </div>
+                          <button 
+                             @click="convertSourceVideo"
+                             :disabled="converting || !selectedVideoFile"
+                             class="h-14 px-7 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl shadow-lg shadow-sky-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                          >
+                             <span v-if="converting" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                             <span>{{ converting ? 'Converting' : `Convert ${selectedFormat.toUpperCase()}` }}</span>
+                          </button>
+                       </div>
+                    </div>
 
-                <!-- Format & Album Selection -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <!-- Format Selection -->
-                   <div class="flex flex-col gap-2">
-                      <label class="text-sm font-bold text-gray-300 uppercase tracking-wider ml-1">Format</label>
-                      <div class="flex gap-2 bg-gray-900/60 border border-gray-700 rounded-xl p-1.5 h-[50px]">
+                    <div v-else class="space-y-3">
+                       <label for="source-url" class="text-xs font-black text-gray-500 uppercase tracking-widest">Google Drive / Cloud Link</label>
+                       <div class="flex flex-col sm:flex-row gap-3">
+                          <div class="relative flex-1 group">
+                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <CloudArrowUpIcon class="h-5 w-5 text-gray-500 group-focus-within:text-emerald-400 transition-colors" />
+                             </div>
+                             <input
+                               id="source-url"
+                               v-model="sourceUrl"
+                               type="text"
+                               placeholder="https://drive.google.com/..."
+                               class="w-full h-14 bg-gray-950/70 border border-gray-700 rounded-xl pl-11 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-medium"
+                               @keyup.enter.prevent="convertSourceVideo"
+                             />
+                          </div>
+                          <button 
+                             @click="convertSourceVideo"
+                             :disabled="converting || !sourceUrl"
+                             class="h-14 px-7 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                          >
+                             <span v-if="converting" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                             <span>{{ converting ? 'Converting' : `Convert ${selectedFormat.toUpperCase()}` }}</span>
+                          </button>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                       <label class="text-xs font-black text-gray-500 uppercase tracking-widest">Format</label>
+                       <div class="grid grid-cols-2 gap-2 bg-gray-950/70 border border-gray-800 rounded-xl p-1.5 h-[54px]">
                           <button 
                             @click="selectedFormat = 'mp3'"
-                            class="flex-1 flex items-center justify-center gap-2 rounded-lg transition-all font-bold text-sm"
+                            class="flex items-center justify-center gap-2 rounded-lg transition-all font-bold text-sm"
                             :class="selectedFormat === 'mp3' ? 'bg-orange-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'"
                           >
-                             <span>MP3</span>
-                             <span class="text-[10px] opacity-60">Audio</span>
+                             <MusicalNoteIcon class="w-4 h-4" />
+                             MP3
                           </button>
                           <button 
                             @click="selectedFormat = 'mp4'"
-                            class="flex-1 flex items-center justify-center gap-2 rounded-lg transition-all font-bold text-sm"
-                            :class="selectedFormat === 'mp4' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'"
+                            class="flex items-center justify-center gap-2 rounded-lg transition-all font-bold text-sm"
+                            :class="selectedFormat === 'mp4' ? 'bg-sky-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'"
                           >
-                             <span>MP4</span>
-                             <span class="text-[10px] opacity-60">Video</span>
+                             <VideoCameraIcon class="w-4 h-4" />
+                             MP4
                           </button>
+                       </div>
+                    </div>
+
+                    <div class="space-y-2">
+                       <label for="converter-album" class="text-xs font-black text-gray-500 uppercase tracking-widest">Save to Album</label>
+                       <select 
+                         id="converter-album"
+                         v-model="selectedAlbumId"
+                         class="w-full bg-gray-950/70 border border-gray-700 rounded-xl px-4 h-[54px] text-white focus:outline-none focus:border-orange-500 transition-all font-medium"
+                       >
+                         <option value="">None (Single Track)</option>
+                         <option v-for="album in albums" :key="album.id" :value="album.id">{{ album.name }}</option>
+                       </select>
+                    </div>
+                 </div>
+
+                 <div v-if="fetchingPreview || videoPreview" class="animate-fade-in">
+                    <div class="bg-gray-950/70 border border-white/10 rounded-xl p-4 flex flex-col sm:flex-row gap-5 overflow-hidden">
+                       <div v-if="fetchingPreview" class="w-full py-8 flex flex-col items-center justify-center gap-3">
+                          <div class="w-8 h-8 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
+                          <p class="text-xs text-gray-500 font-bold uppercase tracking-widest">Searching Video</p>
+                       </div>
+                       
+                       <template v-else-if="videoPreview">
+                          <div class="relative w-full sm:w-44 h-28 rounded-lg overflow-hidden shadow-xl flex-shrink-0">
+                             <img :src="previewThumbnail(videoPreview)" class="w-full h-full object-cover" alt="Thumbnail"/>
+                             <div class="absolute bottom-2 right-2 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-white">
+                                {{ Math.floor(videoPreview.duration / 60) }}:{{ (videoPreview.duration % 60).toString().padStart(2, '0') }}
+                             </div>
+                          </div>
+                          
+                          <div class="flex-1 min-w-0 flex flex-col justify-center">
+                             <span class="text-orange-500 text-[10px] font-black uppercase tracking-widest mb-1">Preview</span>
+                             <h4 class="text-lg font-bold text-white truncate leading-tight mb-1">{{ videoPreview.title }}</h4>
+                             <p class="text-gray-400 text-sm flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                {{ videoPreview.uploader }}
+                             </p>
+                          </div>
+                       </template>
+                    </div>
+                 </div>
+
+                 <transition name="fade">
+                   <div v-if="converting || conversionMessage" class="bg-gray-950/70 rounded-xl p-4 border border-white/10">
+                      <div v-if="converting" class="mb-2">
+                         <div class="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-orange-500 w-1/2 animate-progress origin-left"></div>
+                         </div>
+                         <p class="text-xs text-orange-300 mt-2 font-medium animate-pulse">{{ conversionProgressLabel }}</p>
+                      </div>
+                      <div v-if="conversionMessage" class="flex items-center gap-2">
+                         <CheckIcon v-if="conversionSuccess" class="w-5 h-5 text-green-400" />
+                         <XMarkIcon v-else class="w-5 h-5 text-red-400" />
+                         <span :class="conversionSuccess ? 'text-green-400' : 'text-red-400'" class="font-medium text-sm">
+                            {{ conversionMessage }}
+                         </span>
                       </div>
                    </div>
-
-                   <!-- Album Selection -->
-                   <div class="flex flex-col gap-2">
-                      <label class="text-sm font-bold text-gray-300 uppercase tracking-wider ml-1">Save to Album</label>
-                      <select 
-                        v-model="selectedAlbumId"
-                        class="w-full bg-gray-900/60 border border-gray-700 rounded-xl px-4 h-[50px] text-white focus:outline-none focus:border-orange-500 transition-all font-medium"
-                      >
-                        <option value="">None (Single Track)</option>
-                        <option v-for="album in albums" :key="album.id" :value="album.id">{{ album.name }}</option>
-                      </select>
-                   </div>
-                </div>
-
-
-
-
-                <!-- Video Preview Card -->
-                <div v-if="fetchingPreview || videoPreview" class="animate-fade-in">
-                   <div class="bg-gray-900/80 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row gap-5 relative group overflow-hidden">
-                      <div v-if="fetchingPreview" class="w-full py-10 flex flex-col items-center justify-center gap-3">
-                         <div class="w-8 h-8 border-3 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
-                         <p class="text-xs text-gray-500 font-bold uppercase tracking-widest">Searching Video...</p>
-                      </div>
-                      
-                      <template v-else-if="videoPreview">
-                         <div class="relative w-full sm:w-44 h-28 rounded-xl overflow-hidden shadow-xl flex-shrink-0">
-                            <img :src="videoPreview.thumbnail" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Thumbnail"/>
-                            <div class="absolute bottom-2 right-2 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-white">
-                               {{ Math.floor(videoPreview.duration / 60) }}:{{ (videoPreview.duration % 60).toString().padStart(2, '0') }}
-                            </div>
-                         </div>
-                         
-                         <div class="flex-1 min-w-0 flex flex-col justify-center">
-                            <span class="text-orange-500 text-[10px] font-black uppercase tracking-widest mb-1">Preview</span>
-                            <h4 class="text-lg font-bold text-white truncate leading-tight mb-1">{{ videoPreview.title }}</h4>
-                            <p class="text-gray-400 text-sm flex items-center gap-2">
-                               <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                               {{ videoPreview.uploader }}
-                            </p>
-                         </div>
-                      </template>
-                   </div>
-                </div>
-
-                <!-- Progress / Status -->
-                <transition name="fade">
-                  <div v-if="converting || conversionMessage" class="bg-gray-900/50 rounded-xl p-4 border border-white/5">
-                     <div v-if="converting" class="mb-2">
-                        <div class="h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
-                           <div class="h-full bg-gradient-to-r from-orange-400 to-amber-500 w-1/2 animate-progress origin-left"></div>
-                        </div>
-                        <p class="text-xs text-orange-400 mt-2 font-medium animate-pulse">Downloading and converting stream...</p>
-                     </div>
-                     <div v-if="conversionMessage" class="flex items-center gap-2">
-                        <CheckIcon v-if="conversionSuccess" class="w-5 h-5 text-green-400" />
-                        <XMarkIcon v-else class="w-5 h-5 text-red-400" />
-                        <span :class="conversionSuccess ? 'text-green-400' : 'text-red-400'" class="font-medium text-sm">
-                           {{ conversionMessage }}
-                        </span>
-                     </div>
-                  </div>
-                </transition>
-             </div>
+                 </transition>
+              </div>
            </div>
         </div>
 
@@ -560,6 +620,11 @@
                           <td class="px-6 py-4">
                              <div class="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                 <template v-if="editingFile !== music.name">
+
+                                    <button @click="downloadMusic(music.name)" class="p-2 hover:bg-green-500/10 hover:text-green-400 rounded-lg transition-colors" title="Download">
+                                       <ArrowDownTrayIcon class="w-4 h-4" />
+                                    </button>
+
                                    <button @click="openAddToPlaylist(music.name)" class="p-2 hover:bg-indigo-500/10 hover:text-indigo-400 rounded-lg transition-colors" title="Add to Playlist">
                                       <PlusIcon class="w-4 h-4" />
                                    </button>
@@ -763,13 +828,20 @@ import {
   Cog6ToothIcon,
   PhotoIcon,
   QueueListIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  LinkIcon,
+  VideoCameraIcon,
+  ComputerDesktopIcon,
+  CloudArrowUpIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/vue/24/solid'
 import { fetchSettings, updateSettings, appSettings, appName, brandLogo, brandText } from '../stores/settingsStore.js'
 import { getMusicList, getRecentMp3, deleteMusic, renameMusic, getStats } from '../services/musicService.js'
 import { logout } from '../stores/authStore.js'
 
 const emit = defineEmits(['switch'])
+const MAX_UPLOAD_SIZE_MB = 500
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 // Navigation
 const currentModule = ref('overview')
@@ -802,9 +874,12 @@ const searchQuery = ref('')
 const editingFile = ref(null)
 const newName = ref('')
 const renaming = ref(false)
-const converterMode = ref('youtube')
+const converterMode = ref('url')
+const sourceMode = ref('file')
+const sourceUrl = ref('')
 const selectedFormat = ref('mp3')
 const selectedVideoFile = ref(null)
+const fileInputKey = ref(0)
 const savingPrefs = ref(false)
 
 // Playlist States
@@ -848,6 +923,11 @@ onMounted(() => {
   fetchSettings()
 })
 
+// DOWNLOAD MUSIC
+const downloadMusic = (fileName) => {
+  window.open(`/api/download/${encodeURIComponent(fileName)}`, '_blank')
+}
+
 const openAlbumModal = (album = null) => {
   if (album) {
     editingAlbum.value = album
@@ -887,6 +967,24 @@ const handleDeleteAlbum = async (id) => {
 // Converter logic
 const videoPreview = ref(null)
 const fetchingPreview = ref(false)
+const conversionProgressLabel = computed(() => {
+  if (converterMode.value === 'url') return 'Reading URL and converting stream...'
+  if (sourceMode.value === 'cloud') return 'Fetching cloud source and converting...'
+  return 'Converting temporary computer source...'
+})
+
+const setConverterMode = (mode) => {
+  converterMode.value = mode
+  conversionMessage.value = ''
+  conversionSuccess.value = false
+  if (mode !== 'url') videoPreview.value = null
+}
+
+const setSourceMode = (mode) => {
+  sourceMode.value = mode
+  conversionMessage.value = ''
+  conversionSuccess.value = false
+}
 
 watch(() => youtubeUrl.value, (newUrl) => {
   if (!newUrl) {
@@ -910,6 +1008,12 @@ async function fetchVideoInfo(url) {
   }
 }
 
+function previewThumbnail(preview) {
+  if (preview?.thumbnail) return preview.thumbnail
+  if (preview?.video_id) return `https://i.ytimg.com/vi/${preview.video_id}/hqdefault.jpg`
+  return 'https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/hqdefault.webp'
+}
+
 const convertVideo = async () => {
   if (!youtubeUrl.value) return
   converting.value = true
@@ -921,40 +1025,111 @@ const convertVideo = async () => {
       format: selectedFormat.value
     })
     conversionSuccess.value = true
-    conversionMessage.value = 'Saved to library!'
+    conversionMessage.value = `${selectedFormat.value.toUpperCase()} saved to library!`
     youtubeUrl.value = ''
     videoPreview.value = null
     await fetchStats()
     setTimeout(() => { conversionMessage.value = '' }, 5000)
   } catch (error) {
     conversionSuccess.value = false
-    conversionMessage.value = 'Failed to convert.'
+    conversionMessage.value = conversionErrorMessage(error, 'Failed to convert URL.')
   } finally {
     converting.value = false
   }
 }
 
 const handleFileSelect = (event) => {
-  selectedVideoFile.value = event.target.files[0]
+  const file = event.target.files?.[0] || null
+  conversionMessage.value = ''
+
+  if (!file) {
+    selectedVideoFile.value = null
+    return
+  }
+
+  if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+    selectedVideoFile.value = null
+    conversionSuccess.value = false
+    conversionMessage.value = `This video is ${formatFileSize(file.size)}. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`
+    event.target.value = ''
+    return
+  }
+
+  selectedVideoFile.value = file
 }
 
-const uploadVideo = async () => {
+const formatFileSize = (bytes) => {
+  const units = ['B', 'KB', 'MB', 'GB']
+  let size = bytes
+  let unitIndex = 0
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex += 1
+  }
+
+  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
+}
+
+const conversionErrorMessage = (error, fallback = 'Conversion failed.') => {
+  const status = error?.response?.status
+  const data = error?.response?.data
+
+  if (status === 413) {
+    return `That video is larger than the server allows. Keep it under ${MAX_UPLOAD_SIZE_MB} MB, or increase PHP/web server upload limits.`
+  }
+
+  if (status === 422 && data?.errors) {
+    return Object.values(data.errors).flat()[0] || 'Validation failed.'
+  }
+
+  return data?.message || data?.error || fallback
+}
+
+const convertFileSource = async () => {
   if (!selectedVideoFile.value) return
-  converting.value = true
   const formData = new FormData()
   formData.append('video', selectedVideoFile.value)
+  formData.append('format', selectedFormat.value)
   if (selectedAlbumId.value) formData.append('album_id', selectedAlbumId.value)
-  
+
+  await axios.post('/api/convert-file', formData)
+}
+
+const convertCloudSource = async () => {
+  if (!sourceUrl.value) return
+
+  await axios.post('/api/convert-source-url', {
+    url: sourceUrl.value,
+    album_id: selectedAlbumId.value || null,
+    format: selectedFormat.value
+  })
+}
+
+const convertSourceVideo = async () => {
+  if (sourceMode.value === 'file' && !selectedVideoFile.value) return
+  if (sourceMode.value === 'cloud' && !sourceUrl.value) return
+
+  converting.value = true
+  conversionMessage.value = 'Initializing...'
+
   try {
-    await axios.post('/api/upload-video', formData)
+    if (sourceMode.value === 'file') {
+      await convertFileSource()
+      selectedVideoFile.value = null
+      fileInputKey.value += 1
+    } else {
+      await convertCloudSource()
+      sourceUrl.value = ''
+    }
+
     conversionSuccess.value = true
-    conversionMessage.value = 'Uploaded and converted!'
-    selectedVideoFile.value = null
+    conversionMessage.value = `${selectedFormat.value.toUpperCase()} saved to library!`
     await fetchStats()
     setTimeout(() => { conversionMessage.value = '' }, 5000)
   } catch (error) {
     conversionSuccess.value = false
-    conversionMessage.value = 'Upload failed.'
+    conversionMessage.value = conversionErrorMessage(error, 'Failed to convert source.')
   } finally {
     converting.value = false
   }

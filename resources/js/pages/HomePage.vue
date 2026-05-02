@@ -62,22 +62,18 @@
                 type="text"
                 placeholder="Paste YouTube URL here..."
                 class="flex-1 bg-transparent border-none text-white placeholder-gray-500 px-4 py-3 focus:outline-none text-base md:text-lg w-full"
-                @keyup.enter="convertVideo"
+                @keyup.enter.prevent="convertVideo"
               />
-              
-              <div class="flex flex-row items-center gap-2 px-2 sm:px-0">
-                <!-- Album Selection -->
-                <div class="flex-1 sm:flex-none flex items-center gap-2 px-3 border-l border-white/10 sm:ml-2 h-10">
-                  <select 
-                    v-model="selectedAlbumId"
-                    class="bg-transparent text-sm text-gray-300 focus:outline-none cursor-pointer hover:text-white transition-colors w-full sm:max-w-[150px] appearance-none"
-                  >
-                    <option value="" class="bg-gray-900 text-white">No Album</option>
-                    <option v-for="album in albums" :key="album.id" :value="album.id" class="bg-gray-900 text-white">
-                      {{ album.name }}
-                    </option>
-                  </select>
-                </div>
+
+              <select 
+                v-model="selectedAlbumId"
+                class="bg-transparent text-sm text-gray-300 focus:outline-none cursor-pointer hover:text-white transition-colors w-full sm:max-w-[150px] appearance-none px-3"
+              >
+                <option value="" class="bg-gray-900 text-white">No Album</option>
+                <option v-for="album in albums" :key="album.id" :value="album.id" class="bg-gray-900 text-white">
+                  {{ album.name }}
+                </option>
+              </select>
 
                 <button
                   @click="convertVideo"
@@ -105,7 +101,7 @@
               <div v-else-if="videoPreview" class="flex flex-col sm:flex-row gap-6">
                 <!-- Video Thumbnail -->
                 <div class="relative flex-shrink-0 w-full sm:w-48 h-32 rounded-xl overflow-hidden shadow-2xl">
-                   <img :src="videoPreview.thumbnail" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" alt="Preview"/>
+                   <img :src="previewThumbnail(videoPreview)" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" alt="Preview"/>
                    <div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
                    <div class="absolute bottom-2 right-2 bg-black/80 px-2 py-0.5 rounded text-[10px] font-bold text-white">
                       {{ Math.floor(videoPreview.duration / 60) }}:{{ (videoPreview.duration % 60).toString().padStart(2, '0') }}
@@ -126,8 +122,6 @@
               </div>
             </div>
           </div>
-        </div>
-
         <!-- Progress Indicator & Status Message -->
         <div v-if="loading || conversionMessage" class="mt-8 max-w-lg mx-auto">
           <div class="bg-gray-800/80 backdrop-blur-md rounded-xl p-4 border border-orange-500/20 shadow-lg">
@@ -351,6 +345,12 @@ async function fetchVideoInfo(url) {
   } finally {
     fetchingPreview.value = false
   }
+}
+
+function previewThumbnail(preview) {
+  if (preview?.thumbnail) return preview.thumbnail
+  if (preview?.video_id) return `https://i.ytimg.com/vi/${preview.video_id}/hqdefault.jpg`
+  return 'https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/hqdefault.webp'
 }
 
 // Ambil daftar lagu hasil convert dari backend

@@ -14,7 +14,7 @@
       <div class="flex-1 min-w-0">
         <h3 class="font-bold text-white truncate text-lg group-hover:text-orange-400 transition-colors">{{ displayName }}</h3>
         <div class="flex items-center gap-2 mt-0.5">
-          <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-gray-700 text-gray-300 border border-gray-600">MP3</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-gray-700 text-gray-300 border border-gray-600">{{ fileType }}</span>
         </div>
       </div>
     </div>
@@ -64,6 +64,10 @@ const emits = defineEmits(['play'])
 
 // Display name without extension
 const displayName = computed(() => {
-  return props.music.name.replace(/\.mp3$/i, '')
+  return props.music.name.replace(/\.[^/.]+$/i, '')
+})
+
+const fileType = computed(() => {
+  return (props.music.name.split('.').pop() || 'mp3').toUpperCase()
 })
 </script>
